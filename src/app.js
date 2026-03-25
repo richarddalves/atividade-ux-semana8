@@ -144,7 +144,7 @@ function restaurarEstrelas() {
 }
 
 // Ativa atração via body
-background tem z-index:-1 e não recebe eventos de mouse
+// background tem z-index:-1 e não recebe eventos de mouse
 body
   .on("mousemove", (event) => {
     // Se o mouse estiver sobre a bandeira (ou filhos dela), restaura
