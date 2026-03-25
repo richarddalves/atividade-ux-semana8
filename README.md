@@ -2,5 +2,5 @@
 
 ## Alunos
 
-- Marco Ruas Peixoto
+- Marco Ruas Sales Peixoto
 - Richard Dias Alves
