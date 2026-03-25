@@ -2,15 +2,13 @@ const body = d3.select("body");
 
 const avisoJavascript = d3.select("#aviso-javascript").style("display", "none");
 
-// Dataset de estrelas
 const dadosEstrelas = d3.range(200).map(() => ({
   cx: Math.random() * window.innerWidth,
   cy: Math.random() * window.innerHeight,
-  r: Math.random() * 1.5 + 0.5, // raio entre 0.5 e 2
+  r: Math.random() * 1.5 + 0.5,
   brilhante: Math.random() < 0.6,
 }));
 
-// Estrelas no fundo da página
 const background = body
   .append("svg")
   .attr("width", "100%")
@@ -20,8 +18,6 @@ const background = body
   .style("left", 0)
   .style("z-index", -1);
 
-// Pattern SVG - tile infinito: o zoom atualiza patternTransform em vez de escalar
-// um grupo, então nunca aparecem bordas ou espaços vazios
 const PW = window.innerWidth;
 const PH = window.innerHeight;
 
@@ -44,20 +40,16 @@ padraoEstrelas
   .attr("r", (d) => d.r)
   .attr("fill", "white");
 
-// Rect que preenche o background com o pattern - cobre qualquer resolução
 background
   .append("rect")
   .attr("width", "100%")
   .attr("height", "100%")
   .attr("fill", "url(#estrelas-pattern)");
 
-// Animar estrelas brilhantes (piscar vem de script.js)
 padraoEstrelas.selectAll(".brilhante").each(function () {
   piscar(d3.select(this));
 });
 
-// Zoom no fundo estrelado - só responde a scroll (wheel), sem conflito com o drag da bandeira
-// patternTransform desloca/escala o tile, que repete infinitamente nas bordas
 const zoom = d3
   .zoom()
   .scaleExtent([0.5, 8])
@@ -68,8 +60,6 @@ const zoom = d3
 
 d3.select("body").call(zoom);
 
-// Bandeira
-
 body
   .style("background-color", "#001a33")
   .style("display", "flex")
@@ -78,9 +68,183 @@ body
   .style("height", "100vh")
   .style("margin", "0");
 
-const svg = body.append("svg").attr("width", 600).attr("height", 400);
+const svg = body
+  .append("svg")
+  .attr("width", 600)
+  .attr("height", 400)
+  .style("cursor", "grab");
 
-// Atração das estrelas ao mouse via quadtree
+const defs = svg.append("defs");
+const palco = svg.append("g");
+const bandeira = palco.append("g");
+
+let offsetX = 0;
+let offsetY = 0;
+let balancoX = 0;
+let balancoY = 0;
+let selecaoAtual = null;
+
+function atualizarPosicaoBandeira() {
+  palco.attr("transform", `translate(${offsetX}, ${offsetY})`);
+}
+
+function aplicarBalancoSelecao() {
+  if (!selecaoAtual) return;
+
+  selecaoAtual.conteudo.attr(
+    "transform",
+    `translate(${balancoX}, ${balancoY})`,
+  );
+}
+
+function restaurarBalanco() {
+  if (!selecaoAtual) return;
+
+  balancoX = 0;
+  balancoY = 0;
+  selecaoAtual.conteudo
+    .interrupt()
+    .transition()
+    .duration(500)
+    .ease(d3.easeElasticOut.amplitude(1).period(0.35))
+    .attr("transform", "translate(0, 0)");
+}
+
+function atualizarDestaque() {
+  pecas.forEach((peca) => {
+    const ativa = selecaoAtual && selecaoAtual.nome === peca.nome;
+
+    peca.forma
+      .interrupt()
+      .transition()
+      .duration(180)
+      .attr("stroke", ativa ? "#ffffff" : "none")
+      .attr("stroke-width", ativa ? 4 : 0)
+      .attr("filter", ativa ? "brightness(1.1)" : null);
+  });
+}
+
+function selecionarPeca(peca) {
+  if (selecaoAtual && selecaoAtual.nome !== peca.nome) {
+    selecaoAtual.conteudo.interrupt().attr("transform", "translate(0, 0)");
+  }
+
+  selecaoAtual = peca;
+  balancoX = 0;
+  balancoY = 0;
+  atualizarDestaque();
+}
+
+const verde = bandeira.append("g").attr("data-parte", "verde");
+const verdeForma = verde
+  .append("rect")
+  .attr("width", 600)
+  .attr("height", 400)
+  .attr("fill", "#009C3B");
+const verdeConteudo = verde.append("g");
+
+defs
+  .append("clipPath")
+  .attr("id", "clip-verde")
+  .append("rect")
+  .attr("width", 600)
+  .attr("height", 400);
+
+verdeConteudo.attr("clip-path", "url(#clip-verde)");
+
+const amarelo = verdeConteudo.append("g").attr("data-parte", "amarelo");
+const amareloForma = amarelo
+  .append("polygon")
+  .attr("points", "300,50 550,200 300,350 50,200")
+  .attr("fill", "#FFDF00");
+const amareloConteudo = amarelo.append("g");
+
+defs
+  .append("clipPath")
+  .attr("id", "clip-amarelo")
+  .append("polygon")
+  .attr("points", "300,50 550,200 300,350 50,200");
+
+amareloConteudo.attr("clip-path", "url(#clip-amarelo)");
+
+const azul = amareloConteudo.append("g").attr("data-parte", "azul");
+const azulForma = azul
+  .append("circle")
+  .attr("cx", 300)
+  .attr("cy", 200)
+  .attr("r", 100)
+  .attr("fill", "#002776");
+const azulConteudo = azul.append("g");
+
+defs
+  .append("clipPath")
+  .attr("id", "clip-azul")
+  .append("circle")
+  .attr("cx", 300)
+  .attr("cy", 200)
+  .attr("r", 100);
+
+azulConteudo.attr("clip-path", "url(#clip-azul)");
+
+const faixa = azulConteudo.append("g").attr("data-parte", "faixa");
+const faixaForma = faixa
+  .append("rect")
+  .attr("x", 200)
+  .attr("y", 187)
+  .attr("width", 200)
+  .attr("height", 25)
+  .attr("fill", "white");
+const faixaConteudo = faixa.append("g");
+
+defs
+  .append("clipPath")
+  .attr("id", "clip-faixa")
+  .append("rect")
+  .attr("x", 200)
+  .attr("y", 187)
+  .attr("width", 200)
+  .attr("height", 25);
+
+faixaConteudo.attr("clip-path", "url(#clip-faixa)");
+
+faixaConteudo
+  .append("text")
+  .attr("x", 300)
+  .attr("y", 200)
+  .attr("text-anchor", "middle")
+  .attr("dominant-baseline", "middle")
+  .attr("font-size", "14px")
+  .attr("fill", "black")
+  .text("Ordem e Progresso");
+
+const pecas = [
+  { nome: "verde", grupo: verde, forma: verdeForma, conteudo: verdeConteudo },
+  {
+    nome: "amarelo",
+    grupo: amarelo,
+    forma: amareloForma,
+    conteudo: amareloConteudo,
+  },
+  { nome: "azul", grupo: azul, forma: azulForma, conteudo: azulConteudo },
+  { nome: "faixa", grupo: faixa, forma: faixaForma, conteudo: faixaConteudo },
+];
+
+pecas.forEach((peca) => {
+  peca.forma
+    .style("cursor", "pointer")
+    .on("click", function (event) {
+      event.stopPropagation();
+      selecionarPeca(peca);
+    });
+});
+
+svg.on("click", (event) => {
+  if (event.target === svg.node()) {
+    selecaoAtual = null;
+    atualizarDestaque();
+  }
+});
+
 const RAIO_ATRACAO = 130;
 const FORCA_ATRACAO = 60;
 
@@ -91,23 +255,25 @@ const qtree = d3
   .addAll(dadosEstrelas);
 
 function atrairEstrelas(mx, my) {
-  // Coletar quais estrelas estão dentro do raio usando o quadtree
   const proximas = new Set();
+
   qtree.visit((node, x1, y1, x2, y2) => {
-    // Poda: bounding box não toca o círculo de atração → ignorar sub-árvore
     if (
       x1 > mx + RAIO_ATRACAO ||
       x2 < mx - RAIO_ATRACAO ||
       y1 > my + RAIO_ATRACAO ||
       y2 < my - RAIO_ATRACAO
-    )
+    ) {
       return true;
+    }
+
     if (!node.length) {
-      // nó folha
       const d = node.data;
       const dist = Math.hypot(d.cx - mx, d.cy - my);
       if (dist < RAIO_ATRACAO && dist > 0) proximas.add(d);
     }
+
+    return false;
   });
 
   padraoEstrelas.selectAll("circle").each(function (d) {
@@ -116,6 +282,7 @@ function atrairEstrelas(mx, my) {
       const dy = d.cy - my;
       const dist = Math.hypot(dx, dy);
       const fator = (1 - dist / RAIO_ATRACAO) * FORCA_ATRACAO;
+
       d3.select(this)
         .transition("atracao")
         .duration(250)
@@ -143,11 +310,8 @@ function restaurarEstrelas() {
     .attr("cy", (d) => d.cy);
 }
 
-// Ativa atração via body
-background tem z-index:-1 e não recebe eventos de mouse
 body
   .on("mousemove", (event) => {
-    // Se o mouse estiver sobre a bandeira (ou filhos dela), restaura
     if (svg.node().contains(event.target)) {
       restaurarEstrelas();
     } else {
@@ -156,68 +320,42 @@ body
   })
   .on("mouseleave", restaurarEstrelas);
 
-// Drag na bandeira
-let offsetX = 0,
-  offsetY = 0;
-
-svg.style("cursor", "grab").call(
+svg.call(
   d3
     .drag()
-    .on("start", function () {
-      d3.select(this).style("cursor", "grabbing");
+    .on("start", function (event) {
+      const alvo = event.sourceEvent.target;
+      const arrastandoSelecao =
+        selecaoAtual && selecaoAtual.grupo.node().contains(alvo);
+
+      this.__arrastandoSelecao = arrastandoSelecao;
+      svg.style("cursor", arrastandoSelecao ? "move" : "grabbing");
+
+      if (arrastandoSelecao) {
+        selecaoAtual.conteudo.interrupt();
+      }
     })
     .on("drag", function (event) {
+      if (this.__arrastandoSelecao && selecaoAtual) {
+        balancoX = Math.max(-35, Math.min(35, balancoX + event.dx * 0.8));
+        balancoY = Math.max(-20, Math.min(20, balancoY + event.dy * 0.45));
+        aplicarBalancoSelecao();
+        return;
+      }
+
       offsetX += event.dx;
       offsetY += event.dy;
-      d3.select(this).style(
-        "transform",
-        `translate(${offsetX}px, ${offsetY}px)`,
-      );
+      atualizarPosicaoBandeira();
     })
     .on("end", function () {
-      d3.select(this).style("cursor", "grab");
+      svg.style("cursor", "grab");
+
+      if (this.__arrastandoSelecao) {
+        restaurarBalanco();
+      }
+
+      this.__arrastandoSelecao = false;
     }),
 );
 
-svg
-  .append("rect")
-  .attr("width", 600)
-  .attr("height", 400)
-  .attr("fill", "#009C3B");
-
-svg
-  .append("polygon")
-  .attr("points", "300,50 550,200 300,350 50,200")
-  .attr("fill", "#FFDF00");
-
-svg
-  .append("circle")
-  .attr("cx", 300)
-  .attr("cy", 200)
-  .attr("r", 100)
-  .attr("fill", "#002776");
-
-svg
-  .append("rect")
-  .attr("x", 200)
-  .attr("y", 187)
-  .attr("width", 200)
-  .attr("height", 25)
-  .attr("fill", "white");
-
-// svg.append("text")
-//     .attr("x", 250)
-//     .attr("y", 203)
-//     .attr("font-size", "14px")
-//     .attr("fill", "black")
-//     .text("Ordem e Progresso");
-
-svg
-  .append("text")
-  .attr("x", 300)
-  .attr("y", 200)
-  .attr("text-anchor", "middle")
-  .attr("dominant-baseline", "middle")
-  .attr("font-size", "14px")
-  .attr("fill", "black")
-  .text("Ordem e Progresso");
+atualizarPosicaoBandeira();
