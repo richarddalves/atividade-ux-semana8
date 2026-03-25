@@ -2,6 +2,14 @@ const body = d3.select("body");
 
 const avisoJavascript = d3.select("#aviso-javascript").style("display", "none");
 
+// Dataset de estrelas
+const dadosEstrelas = d3.range(200).map(() => ({
+  cx: Math.random() * window.innerWidth,
+  cy: Math.random() * window.innerHeight,
+  r: Math.random() * 1.5 + 0.5, // raio entre 0.5 e 2
+  brilhante: Math.random() < 0.6,
+}));
+
 // Estrelas no fundo da página
 const background = body
   .append("svg")
@@ -12,23 +20,34 @@ const background = body
   .style("left", 0)
   .style("z-index", -1);
 
-for (let i = 0; i < 200; i++) {
-  const estrela = background
-    .append("circle")
-    .attr("cx", Math.random() * window.innerWidth)
-    .attr("cy", Math.random() * window.innerHeight)
-    .attr("r", Math.random() * 1.5 + 0.5) // raio entre 0.5 e 2
-    .attr("fill", "white");
+const grupoEstrelas = background.append("g");
 
-  if (Math.random() < 0.6) {
-    estrela.attr("class", "brilhante");
-  }
-}
+grupoEstrelas
+  .selectAll("circle")
+  .data(dadosEstrelas)
+  .enter()
+  .append("circle")
+  .attr("class", (d) => (d.brilhante ? "estrela brilhante" : "estrela"))
+  .attr("cx", (d) => d.cx)
+  .attr("cy", (d) => d.cy)
+  .attr("r", (d) => d.r)
+  .attr("fill", "white");
 
-d3.selectAll(".brilhante")
-    .each(function() {
-        piscar(d3.select(this));
-    })
+// Animar estrelas brilhantes (piscar vem de script.js)
+grupoEstrelas.selectAll(".brilhante").each(function () {
+  piscar(d3.select(this));
+});
+
+// Zoom no fundo estrelado — só responde a scroll (wheel), sem conflito com o drag da bandeira
+const zoom = d3
+  .zoom()
+  .scaleExtent([0.5, 8])
+  .filter((event) => event.type === "wheel")
+  .on("zoom", (event) => {
+    grupoEstrelas.attr("transform", event.transform);
+  });
+
+d3.select("body").call(zoom);
 
 // Bandeira
 
@@ -41,6 +60,29 @@ body
   .style("margin", "0");
 
 const svg = body.append("svg").attr("width", 600).attr("height", 400);
+
+// Drag na bandeira
+let offsetX = 0,
+  offsetY = 0;
+
+svg.style("cursor", "grab").call(
+  d3
+    .drag()
+    .on("start", function () {
+      d3.select(this).style("cursor", "grabbing");
+    })
+    .on("drag", function (event) {
+      offsetX += event.dx;
+      offsetY += event.dy;
+      d3.select(this).style(
+        "transform",
+        `translate(${offsetX}px, ${offsetY}px)`,
+      );
+    })
+    .on("end", function () {
+      d3.select(this).style("cursor", "grab");
+    }),
+);
 
 svg
   .append("rect")
